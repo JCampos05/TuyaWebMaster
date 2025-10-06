@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Foco Tuya</title>
+  <link rel = "stylesheet" href = "style1.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🌈 Control Foco Tuya</h1>
+    <p>Panel de control avanzado para iluminación inteligente</p>
+  </div>
+
+  <div class="status">
+    <div id="statusDisplay">
+      <strong>Estado:</strong> <span id="connectionStatus">Conectando...</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <!-- Control básico de encendido/apagado -->
+    <div class="control-group">
+      <h3>💡 Control Básico</h3>
+      <div class="button-grid">
+        <button class="btn btn-on" onclick="toggleDevice(true)">Encender</button>
+        <button class="btn btn-off" onclick="toggleDevice(false)">Apagar</button>
+        <button class="btn" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;" onclick="refreshInfo()">Estado</button>
+      </div>
+    </div>
+
+    <!-- Colores predefinidos -->
+    <div class="control-group">
+      <h3>🎨 Colores Predefinidos</h3>
+      <div class="button-grid">
+        <div class="color-btn red" onclick="setPresetColor('red')" title="Rojo"></div>
+        <div class="color-btn green" onclick="setPresetColor('green')" title="Verde"></div>
+        <div class="color-btn blue" onclick="setPresetColor('blue')" title="Azul"></div>
+        <div class="color-btn yellow" onclick="setPresetColor('yellow')" title="Amarillo"></div>
+        <div class="color-btn purple" onclick="setPresetColor('purple')" title="Morado"></div>
+        <div class="color-btn cyan" onclick="setPresetColor('cyan')" title="Cian"></div>
+        <div class="color-btn orange" onclick="setPresetColor('orange')" title="Naranja"></div>
+        <div class="color-btn pink" onclick="setPresetColor('pink')" title="Rosa"></div>
+        <div class="color-btn white" onclick="setPresetColor('white')" title="Blanco"></div>
+      </div>
+    </div>
+
+    <!-- Control HSV personalizado -->
+    <div class="control-group">
+      <h3>🌈 Control de Color HSV</h3>
+      <div class="preview-color" id="colorPreview"></div>
+
+      <div class="slider-group">
+        <label for="hueSlider">Matiz (H): <span id="hueValue">180</span>°</label>
+        <input type="range" id="hueSlider" class="slider hue-slider" min="0" max="360" value="180" oninput="updateHSV()">
+      </div>
+
+      <div class="slider-group">
+        <label for="saturationSlider">Saturación (S): <span id="saturationValue">500</span></label>
+        <input type="range" id="saturationSlider" class="slider saturation-slider" min="0" max="1000" value="500" oninput="updateHSV()">
+      </div>
+
+      <div class="slider-group">
+        <label for="valueSlider">Valor (V): <span id="valueValue">500</span></label>
+        <input type="range" id="valueSlider" class="slider brightness-slider" min="10" max="1000" value="500" oninput="updateHSV()">
+      </div>
+
+      <button class="btn" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333; width: 100%;" onclick="applyHSVColor()">Aplicar Color</button>
+    </div>
+
+    <!-- Control de brillo -->
+    <div class="control-group">
+      <h3>🔆 Control de Brillo</h3>
+      <div class="slider-group">
+        <label for="brightnessSlider">Brillo: <span id="brightnessValue">500</span></label>
+        <input type="range" id="brightnessSlider" class="slider brightness-slider" min="10" max="1000" value="500" oninput="updateBrightness()">
+      </div>
+      <button class="btn" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); width: 100%;" onclick="applyBrightness()">Aplicar Brillo</button>
+    </div>
+
+    <!-- Control de temperatura de color -->
+    <div class="control-group">
+      <h3>🌡️ Temperatura de Color</h3>
+      <div class="slider-group">
+        <label for="temperatureSlider">Temperatura: <span id="temperatureValue">500</span> (Cálido ← → Frío)</label>
+        <input type="range" id="temperatureSlider" class="slider temperature-slider" min="0" max="1000" value="500" oninput="updateTemperature()">
+      </div>
+      <button class="btn" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333; width: 100%;" onclick="applyTemperature()">Aplicar Temperatura</button>
+    </div>
+
+    <!-- Modos de trabajo -->
+    <div class="control-group">
+      <h3>⚙️ Modos de Trabajo</h3>
+      <div class="mode-buttons">
+        <button class="btn mode-btn" onclick="setMode('white')">Blanco</button>
+        <button class="btn mode-btn" onclick="setMode('colour')">Color</button>
+        <button class="btn mode-btn" onclick="setMode('scene')">Escena</button>
+        <button class="btn mode-btn" onclick="setMode('music')">Música</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="messageArea"></div>
+</div>
+
+<script>
+  let currentHSV = { h: 180, s: 500, v: 500 };
+
+  // Función para mostrar mensajes
+  function showMessage(message, type = 'success') {
+    const messageArea = document.getElementById('messageArea');
+    messageArea.innerHTML = `<div class="message ${type}">${message}</div>`;
+    setTimeout(() => {
+      messageArea.innerHTML = '';
+    }, 5000);
+  }
+
+  // Función para realizar peticiones HTTP
+  async function makeRequest(url, method = 'GET', data = null) {
+    try {
+      const options = {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      };
+
+      if (data) {
+        options.body = JSON.stringify(data);
+      }
+
+      const response = await fetch(url, options);
+      const result = await response.json();
+
+      if (result.success) {
+        showMessage(result.message, 'success');
+      } else {
+        showMessage(result.message || 'Error en la operación', 'error');
+      }
+
+      return result;
+    } catch (error) {
+      showMessage(`Error de conexión: ${error.message}`, 'error');
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Control básico de encendido/apagado
+  async function toggleDevice(state) {
+    const endpoint = state ? '/device/on' : '/device/off';
+    await makeRequest(endpoint, 'POST');
+  }
+
+  // Aplicar color predefinido
+  async function setPresetColor(color) {
+    await makeRequest('/device/color/preset', 'POST', { color: color });
+  }
+
+  // Actualizar valores HSV
+  function updateHSV() {
+    const h = document.getElementById('hueSlider').value;
+    const s = document.getElementById('saturationSlider').value;
+    const v = document.getElementById('valueSlider').value;
+
+    document.getElementById('hueValue').textContent = h;
+    document.getElementById('saturationValue').textContent = s;
+    document.getElementById('valueValue').textContent = v;
+
+    currentHSV = { h: parseInt(h), s: parseInt(s), v: parseInt(v) };
+    updateColorPreview();
+  }
+
+  // Actualizar preview de color
+  function updateColorPreview() {
+    const preview = document.getElementById('colorPreview');
+    const hslColor = `hsl(${currentHSV.h}, ${(currentHSV.s/1000)*100}%, ${(currentHSV.v/1000)*50}%)`;
+    preview.style.background = hslColor;
+  }
+
+  // Aplicar color HSV
+  async function applyHSVColor() {
+    await makeRequest('/device/color/hsv', 'POST', currentHSV);
+  }
+
+  // Control de brillo
+  function updateBrightness() {
+    const brightness = document.getElementById('brightnessSlider').value;
+    document.getElementById('brightnessValue').textContent = brightness;
+  }
+
+  async function applyBrightness() {
+    const brightness = document.getElementById('brightnessSlider').value;
+    await makeRequest('/device/brightness', 'POST', { brightness: parseInt(brightness) });
+  }
+
+  // Control de temperatura
+  function updateTemperature() {
+    const temperature = document.getElementById('temperatureSlider').value;
+    document.getElementById('temperatureValue').textContent = temperature;
+  }
+
+  async function applyTemperature() {
+    const temperature = document.getElementById('temperatureSlider').value;
+    await makeRequest('/device/temperature', 'POST', { temperature: parseInt(temperature) });
+  }
+
+  // Cambiar modo de trabajo
+  async function setMode(mode) {
+    await makeRequest('/device/mode', 'POST', { mode: mode });
+  }
+
+  // Obtener información del dispositivo
+  async function refreshInfo() {
+    const result = await makeRequest('/device/info', 'GET');
+    if (result.success) {
+      console.log('Info del dispositivo:', result.data);
+    }
+  }
+
+  // Verificar estado del servidor
+  async function checkServerStatus() {
+    try {
+      const result = await makeRequest('/health', 'GET');
+      const statusElement = document.getElementById('connectionStatus');
+      if (result.success || result.status === 'OK') {
+        statusElement.textContent = 'Conectado ✅';
+        statusElement.style.color = 'green';
+      } else {
+        statusElement.textContent = 'Desconectado ❌';
+        statusElement.style.color = 'red';
+      }
+    } catch (error) {
+      const statusElement = document.getElementById('connectionStatus');
+      statusElement.textContent = 'Error de conexión ❌';
+      statusElement.style.color = 'red';
+    }
+  }
+
+  // Inicialización
+  document.addEventListener('DOMContentLoaded', function() {
+    updateHSV();
+    checkServerStatus();
+
+    // Verificar estado cada 30 segundos
+    setInterval(checkServerStatus, 30000);
+  });
+</script>
+</body>
+</html>
